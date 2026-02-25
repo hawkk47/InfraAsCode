@@ -26,7 +26,7 @@ cd InfraAsCode
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install ansible
+pip install -r reqeuirement.txt
 ansible-galaxy collection install community.docker
 ```
 
@@ -43,8 +43,7 @@ tofu apply
 
 ### 5. Générer l'inventaire et configurer la VM
 ```bash
-bash inventory.sh
-ansible-playbook -i inventory.ini playbook.yml
+ansible-playbook -i inventory.sh playbook.yml
 ```
 
 ### 6. Déployer les stacks Docker
