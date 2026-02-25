@@ -21,6 +21,7 @@ git clone https://github.com/hawkk47/InfraAsCode.git
 cd InfraAsCode
 ```
 
+
 ### 2. Créer l'environnement Python
 ```bash
 python3 -m venv .venv
