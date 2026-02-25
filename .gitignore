@@ -1,0 +1,6 @@
+openrc-etudiant.sh
+*tfstate*
+terraform.tfvars
+inventory.ini
+.terraform
+.venv
