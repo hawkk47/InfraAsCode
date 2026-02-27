@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--providers.swarm.endpoint=unix:///var/run/docker.sock"
+      - "--providers.swarm.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--api.dashboard=true"
+    ports:
+      - "80:80"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - traefik_proxy
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.dashboard.rule=Host(`traefik.{{ ansible_host }}.sslip.io`)"
+        - "traefik.http.routers.dashboard.entrypoints=web"
+        - "traefik.http.routers.dashboard.service=api@internal"
+        - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
+
+networks:
+  traefik_proxy:
+    driver: overlay
+    attachable: true

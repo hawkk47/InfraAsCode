@@ -1,8 +1,10 @@
 ---
+#################################
+# Sécurisation (tous les nœuds)
+#################################
 - name: Installer fail2ban
-  hosts: webservers
+  hosts: swarm
   become: true
-
   tasks:
     - name: Mettre à jour le cache apt
       apt:
@@ -19,10 +21,12 @@
         state: started
         enabled: true
 
+#################################
+# Docker (tous les nœuds)
+#################################
 - name: Installer Docker
-  hosts: webservers
+  hosts: swarm
   become: true
-
   tasks:
     - name: Installer les dépendances Docker
       apt:
@@ -75,18 +79,130 @@
         groups: docker
         append: yes
 
-- name: Initialiser Docker Swarm
-  hosts: webservers
-  become: true
-
-  tasks:
     - name: Installer le SDK Python Docker via apt
       apt:
         name: python3-docker
         state: present
         update_cache: yes
-        
+
+#################################
+# Swarm Manager (nœud 0)
+#################################
+- name: Initialiser Docker Swarm sur le Manager
+  hosts: managers
+  become: true
+  tasks:
     - name: Initialiser le cluster Docker Swarm
       community.docker.docker_swarm:
         state: present
         advertise_addr: "{{ ansible_facts['default_ipv4']['address'] }}"
+
+    - name: Récupérer le token worker
+      command: docker swarm join-token worker -q
+      register: swarm_worker_token
+      changed_when: false
+
+    - name: Stocker le token et l'IP du manager
+      set_fact:
+        worker_token: "{{ swarm_worker_token.stdout }}"
+        manager_addr: "{{ ansible_facts['default_ipv4']['address'] }}"
+
+#################################
+# Swarm Worker (nœud 1)
+#################################
+- name: Joindre le Worker au Swarm
+  hosts: workers
+  become: true
+  vars:
+    manager_ip: "{{ hostvars[groups['managers'][0]]['manager_addr'] }}"
+    token: "{{ hostvars[groups['managers'][0]]['worker_token'] }}"
+  tasks:
+    - name: Vérifier si le nœud est déjà dans le Swarm
+      command: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
+      register: swarm_state
+      changed_when: false
+
+    - name: Joindre le Swarm
+      command: docker swarm join --token {{ token }} {{ manager_ip }}:2377
+      when: swarm_state.stdout != "active"
+
+#################################
+# NFS Server (Manager)
+#################################
+- name: Configurer le serveur NFS sur le Manager
+  hosts: managers
+  become: true
+  tasks:
+    - name: Installer nfs-kernel-server
+      apt:
+        name: nfs-kernel-server
+        state: present
+        update_cache: yes
+
+    - name: Créer le dossier NFS pour Etherpad
+      file:
+        path: /var/nfs/etherpad_data
+        state: directory
+        mode: '0777'
+        owner: nobody
+        group: nogroup
+
+    - name: Configurer les exports NFS
+      lineinfile:
+        path: /etc/exports
+        line: "/var/nfs/etherpad_data *(rw,sync,no_subtree_check,no_root_squash)"
+        create: yes
+
+    - name: Redémarrer NFS
+      service:
+        name: nfs-kernel-server
+        state: restarted
+        enabled: true
+
+#################################
+# NFS Client (Workers)
+#################################
+- name: Configurer les clients NFS sur les Workers
+  hosts: workers
+  become: true
+  tasks:
+    - name: Installer nfs-common
+      apt:
+        name: nfs-common
+        state: present
+        update_cache: yes
+
+#################################
+# Déployer les stacks (Manager)
+#################################
+- name: Déployer les stacks Docker
+  hosts: managers
+  become: true
+  tasks:
+    - name: Générer la stack Traefik
+      ansible.builtin.template:
+        src: ./templates/traefik-stack.yml.j2
+        dest: /home/ubuntu/traefik-stack.yml
+
+    - name: Générer la stack Whoami
+      ansible.builtin.template:
+        src: ./templates/app-whoami-stack.yml.j2
+        dest: /home/ubuntu/app-whoami-stack.yml
+
+    - name: Générer la stack Etherpad
+      ansible.builtin.template:
+        src: ./templates/app-etherpad-stack.yml.j2
+        dest: /home/ubuntu/app-etherpad-stack.yml
+
+    - name: Déployer Traefik
+      shell: docker stack deploy -c /home/ubuntu/traefik-stack.yml traefik
+
+    - name: Attendre que le réseau overlay soit prêt
+      pause:
+        seconds: 10
+
+    - name: Déployer Whoami
+      shell: docker stack deploy -c /home/ubuntu/app-whoami-stack.yml whoami
+
+    - name: Déployer Etherpad
+      shell: docker stack deploy -c /home/ubuntu/app-etherpad-stack.yml etherpad

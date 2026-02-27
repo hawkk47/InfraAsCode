@@ -4,17 +4,16 @@ services:
   whoami:
     image: traefik/whoami
     networks:
-      - traefik-public
+      - traefik_proxy
     deploy:
       replicas: 2
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.whoami.rule=Host(`whoami.${IP}.traefik.me`)"
+        - "traefik.http.routers.whoami.rule=Host(`whoami.{{ ansible_host }}.sslip.io`)"
         - "traefik.http.routers.whoami.entrypoints=web"
-        #- "traefik.http.routers.whoami.tls.certresolver=letsencrypt"
         - "traefik.http.services.whoami.loadbalancer.server.port=80"
 
 networks:
-  traefik-public:
+  traefik_proxy:
     external: true
-    name: traefik_traefik-public
+    name: traefik_traefik_proxy
