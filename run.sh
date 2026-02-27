@@ -18,7 +18,7 @@ echo "[2/6] Provisionnement de l'infrastructure (2 VMs)..."
 tofu init -input=false
 tofu apply -auto-approve
 
-# 3. Rendre le backend S3 public
+# 3. Rendre le backend S3 publi
 echo ""
 echo "[3/6] Rendre le backend S3 public..."
 aws s3api put-bucket-acl --bucket iac-axel-dln --acl public-read --endpoint-url https://s3.sbg.perf.cloud.ovh.net || true
