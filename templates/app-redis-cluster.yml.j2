@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  redis-1:
+    image: redis:alpine
+    command: redis-server --port 6379 --appendonly yes
+    networks:
+      - redis_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+    volumes:
+      - redis-data-1:/data
+
+  redis-2:
+    image: redis:alpine
+    command: redis-server --port 6379 --appendonly yes
+    networks:
+      - redis_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+    volumes:
+      - redis-data-2:/data
+
+  redis-3:
+    image: redis:alpine
+    command: redis-server --port 6379 --appendonly yes
+    networks:
+      - redis_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+    volumes:
+      - redis-data-3:/data
+
+  # App de démonstration qui utilise les Redis shards
+  redis-demo:
+    image: traefik/whoami
+    networks:
+      - redis_net
+      - traefik_proxy
+    deploy:
+      replicas: 3
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.redis-demo.rule=Host(`redis.{{ ansible_host }}.sslip.io`)"
+        - "traefik.http.routers.redis-demo.entrypoints=web"
+        - "traefik.http.services.redis-demo.loadbalancer.server.port=80"
+
+networks:
+  redis_net:
+    driver: overlay
+  traefik_proxy:
+    external: true
+    name: traefik_traefik_proxy
+
+volumes:
+  redis-data-1:
+  redis-data-2:
+  redis-data-3:
