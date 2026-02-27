@@ -21,6 +21,10 @@ services:
 volumes:
   etherpad-data:
     driver: local
+    driver_opts:
+      type: nfs
+      o: "addr={{ ansible_host }},nolock,soft,rw"
+      device: ":/var/nfs/etherpad_data"
 
 networks:
   traefik_proxy:

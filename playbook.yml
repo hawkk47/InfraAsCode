@@ -127,6 +127,52 @@
       when: swarm_state.stdout != "active"
 
 #################################
+# NFS Server (Manager)
+#################################
+- name: Configurer le serveur NFS sur le Manager
+  hosts: managers
+  become: true
+  tasks:
+    - name: Installer nfs-kernel-server
+      apt:
+        name: nfs-kernel-server
+        state: present
+        update_cache: yes
+
+    - name: Créer le dossier NFS pour Etherpad
+      file:
+        path: /var/nfs/etherpad_data
+        state: directory
+        mode: '0777'
+        owner: nobody
+        group: nogroup
+
+    - name: Configurer les exports NFS
+      lineinfile:
+        path: /etc/exports
+        line: "/var/nfs/etherpad_data *(rw,sync,no_subtree_check,no_root_squash)"
+        create: yes
+
+    - name: Redémarrer NFS
+      service:
+        name: nfs-kernel-server
+        state: restarted
+        enabled: true
+
+#################################
+# NFS Client (Workers)
+#################################
+- name: Configurer les clients NFS sur les Workers
+  hosts: workers
+  become: true
+  tasks:
+    - name: Installer nfs-common
+      apt:
+        name: nfs-common
+        state: present
+        update_cache: yes
+
+#################################
 # Déployer les stacks
 #################################
 - name: Déployer les stacks Docker
@@ -148,11 +194,6 @@
         src: ./templates/app-etherpad-stack.yml.j2
         dest: /home/ubuntu/app-etherpad-stack.yml
 
-    - name: Générer la stack Redis Cluster (sharding)
-      ansible.builtin.template:
-        src: ./templates/app-redis-cluster.yml.j2
-        dest: /home/ubuntu/app-redis-cluster.yml
-
     - name: Déployer Traefik
       shell: docker stack deploy -c /home/ubuntu/traefik-stack.yml traefik
 
@@ -163,8 +204,5 @@
     - name: Déployer Whoami (6 replicas pour load balancing)
       shell: docker stack deploy -c /home/ubuntu/app-whoami-stack.yml whoami
 
-    - name: Déployer Etherpad
+    - name: Déployer Etherpad (avec NFS)
       shell: docker stack deploy -c /home/ubuntu/app-etherpad-stack.yml etherpad
-
-    - name: Déployer Redis Cluster (3 shards)
-      shell: docker stack deploy -c /home/ubuntu/app-redis-cluster.yml redis
