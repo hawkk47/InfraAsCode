@@ -49,12 +49,11 @@ data "openstack_networking_network_v2" "public" {
 }
 
 #################################
-# INSTANCES SWARM (2 VMs)
+# INSTANCE
 #################################
 
-resource "openstack_compute_instance_v2" "vm_swarm" {
-  count           = 2
-  name            = "vm-iac-tp-${count.index}"
+resource "openstack_compute_instance_v2" "vm" {
+  name            = "iac-axel-dln"
   image_name      = "Ubuntu 24.04"
   flavor_name     = "d2-2"
   key_pair        = openstack_compute_keypair_v2.ssh_key.name
@@ -69,14 +68,6 @@ resource "openstack_compute_instance_v2" "vm_swarm" {
 # OUTPUTS
 #################################
 
-output "instances_ips" {
-  value = openstack_compute_instance_v2.vm_swarm[*].access_ip_v4
-}
-
-output "manager_ip" {
-  value = openstack_compute_instance_v2.vm_swarm[0].access_ip_v4
-}
-
-output "worker_ip" {
-  value = openstack_compute_instance_v2.vm_swarm[1].access_ip_v4
+output "instance_ip" {
+  value = openstack_compute_instance_v2.vm.access_ip_v4
 }

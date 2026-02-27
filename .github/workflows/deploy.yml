@@ -50,15 +50,17 @@ jobs:
       - name: Tofu Apply
         run: tofu apply -auto-approve
 
-      - name: Wait for VMs
+      - name: Make S3 backend public
         run: |
-          MANAGER_IP=$(tofu output -raw manager_ip)
-          WORKER_IP=$(tofu output -raw worker_ip)
-          for IP in $MANAGER_IP $WORKER_IP; do
-            echo "Waiting for $IP..."
-            until nc -zvw5 $IP 22 2>/dev/null; do sleep 5; done
-            echo "$IP ready!"
-          done
+          aws s3api put-bucket-acl --bucket iac-axel-dln --acl public-read --endpoint-url https://s3.sbg.perf.cloud.ovh.net || true
+          aws s3api put-object-acl --bucket iac-axel-dln --key terraform.tfstate --acl public-read --endpoint-url https://s3.sbg.perf.cloud.ovh.net || true
+
+      - name: Wait for VM
+        run: |
+          NODE_IP=$(tofu output -raw instance_ip)
+          echo "Waiting for $NODE_IP..."
+          until nc -zvw5 $NODE_IP 22 2>/dev/null; do sleep 5; done
+          echo "$NODE_IP ready!"
 
       - name: Generate inventory
         run: bash inventory.sh
